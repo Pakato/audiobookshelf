@@ -17,6 +17,7 @@
     "docker-amd64-local": "docker buildx build --platform linux/amd64 --load .  -t advplyr/audiobookshelf-amd64-local",
     "docker-arm64-local": "docker buildx build --platform linux/arm64 --load .  -t advplyr/audiobookshelf-arm64-local",
     "deploy-linux": "node deploy/linux",
+    "postinstall": "node build/patch-node25.js",
     "test": "mocha",
     "coverage": "nyc mocha"
   },
