@@ -61,5 +61,8 @@ SafeBuffer.allocUnsafeSlow = function (size) {
   if (typeof size !== 'number') {
     throw new TypeError('Argument must be a number')
   }
-  return buffer.SlowBuffer(size)
+  if (buffer.SlowBuffer) {
+    return buffer.SlowBuffer(size)
+  }
+  return Buffer.allocUnsafeSlow(size)
 }

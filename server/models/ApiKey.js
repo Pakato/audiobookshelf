@@ -1,5 +1,5 @@
 const { DataTypes, Model, Op } = require('sequelize')
-const jwt = require('jsonwebtoken')
+const jwt = require('../libs/jsonwebtoken')
 const { LRUCache } = require('lru-cache')
 const Logger = require('../Logger')
 
