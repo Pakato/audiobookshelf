@@ -221,6 +221,7 @@ function convertValue(value, pgColumn) {
   if (!pgColumn) return value
   const dataType = pgColumn.data_type
   const udtName = pgColumn.udt_name
+  const isNotNull = pgColumn.is_nullable === 'NO'
 
   if (dataType === 'boolean') {
     return normalizeBoolean(value)
@@ -234,6 +235,13 @@ function convertValue(value, pgColumn) {
     if (typeof value === 'number') return value
     if (typeof value === 'string' && /^-?\d+$/.test(value.trim())) {
       return Number(value)
+    }
+  }
+
+  if (isNotNull && (value === null || value === undefined)) {
+    const isTimestamp = dataType === 'timestamp without time zone' || dataType === 'timestamp with time zone' || dataType === 'date' || udtName === 'timestamp' || udtName === 'timestamptz'
+    if (isTimestamp) {
+      return new Date()
     }
   }
 
@@ -264,16 +272,18 @@ function getOverlongColumns(row, insertColumns) {
   return overlong
 }
 
-async function main() {
+async function main({ sqlitePath } = {}) {
   if (!DATABASE_URL) {
     throw new Error('DATABASE_URL is required')
   }
 
-  console.log(`[migrate] sqlite source: ${SQLITE_PATH}`)
+  const resolvedSqlitePath = sqlitePath || SQLITE_PATH
+
+  console.log(`[migrate] sqlite source: ${resolvedSqlitePath}`)
   console.log(`[migrate] postgres target schema: ${PG_SCHEMA}`)
   console.log(`[migrate] dry run: ${DRY_RUN}`)
 
-  const sqliteDb = await openSqlite(SQLITE_PATH)
+  const sqliteDb = await openSqlite(resolvedSqlitePath)
   const pg = new Client({ connectionString: DATABASE_URL })
   await pg.connect()
 
@@ -320,7 +330,7 @@ async function main() {
     const pgColumnsByTable = new Map()
     for (const { postgresTable } of tablesToMigrate) {
       const columnsResult = await pg.query(
-        `SELECT column_name, data_type, udt_name, character_maximum_length FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 ORDER BY ordinal_position`,
+        `SELECT column_name, data_type, udt_name, character_maximum_length, is_nullable FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 ORDER BY ordinal_position`,
         [PG_SCHEMA, postgresTable]
       )
       const columnMap = new Map(columnsResult.rows.map((column) => [column.column_name.toLowerCase(), column]))
@@ -329,6 +339,7 @@ async function main() {
 
     const overlongVarcharIssues = await findOverlongVarcharValues(sqliteDb, tablesToMigrate, pgColumnsByTable)
     const integerTypeIssues = await findIntegerTypeIssues(sqliteDb, tablesToMigrate, pgColumnsByTable)
+
 
     if (overlongVarcharIssues.length) {
       console.error('[migrate] overlong source values detected for varchar columns:')
@@ -457,6 +468,7 @@ async function main() {
       })
     }
 
+    
     const mismatches = parity.filter((row) => row.sqliteCount !== row.postgresCount)
     if (mismatches.length) {
       console.error('[migrate] row-count mismatches detected:')
@@ -481,6 +493,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  main,
   normalizeJson,
   isIntegerCompatible,
   convertValue,

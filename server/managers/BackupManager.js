@@ -16,6 +16,7 @@ const { getFileSize } = require('../utils/fileUtils')
 const Backup = require('../objects/Backup')
 const CacheManager = require('./CacheManager')
 const NotificationManager = require('./NotificationManager')
+const { main: migrateSqliteToPostgres } = require('../scripts/migrateSqliteToPostgres')
 
 class BackupManager {
   constructor() {
@@ -228,6 +229,15 @@ class BackupManager {
     await fs.ensureDir(this.AuthorsMetadataPath)
     await zip.extract('metadata-authors/', this.AuthorsMetadataPath)
     await zip.close()
+
+    // If using PostgreSQL, migrate the restored SQLite database to Postgres
+    if (!Database.isSqliteDialect()) {
+      Logger.info(`[BackupManager] PostgreSQL detected - running SQLite to Postgres migration`)
+      const sqlitePath = Path.join(global.ConfigPath, 'absdatabase.sqlite')
+      await migrateSqliteToPostgres({ sqlitePath }).catch((error) => {
+        Logger.error(`[BackupManager] SQLite to Postgres migration failed after backup restore`, error)
+      })
+    }
 
     // Reconnect db
     await Database.reconnect()
