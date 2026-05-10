@@ -10,19 +10,16 @@ on:
         required: true
         default: 'latest'
   push:
-    branches: [main, master]
     tags:
       - 'v*.*.*'
-    # Only build when files in these directories have been changed
-    paths:
-      - client/**
-      - server/**
-      - index.js
-      - package.json
 
 jobs:
   build:
-    if: ${{ !contains(github.event.head_commit.message, 'skip ci') && github.repository == 'pakato/audiobookshelf' }}
+    if: >-
+      github.repository == 'pakato/audiobookshelf' &&
+      !contains(github.event.head_commit.message, 'skip ci') &&
+      (github.event_name == 'workflow_dispatch' ||
+       contains(fromJSON('["refs/heads/main", "refs/heads/master"]'), github.event.base_ref))
     runs-on: ubuntu-24.04
 
     steps:
