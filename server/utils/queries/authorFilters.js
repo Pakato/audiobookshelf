@@ -66,14 +66,14 @@ module.exports = {
         [Sequelize.Op.and]: [Sequelize.literal(matchAuthor), { libraryId }]
       },
       attributes: {
-        include: [[Sequelize.literal('(SELECT count(*) FROM bookAuthors ba WHERE ba.authorId = author.id)'), 'numBooks']]
+        include: [[Sequelize.literal('(SELECT count(*) FROM bookAuthors ba WHERE ba.authorId = author.id)'), 'numbooks']]
       },
       limit,
       offset
     })
     const authorMatches = []
     for (const author of authors) {
-      const oldAuthor = author.toOldJSONExpanded(author.dataValues.numBooks)
+      const oldAuthor = author.toOldJSONExpanded(author.dataValues.numbooks)
       authorMatches.push(oldAuthor)
     }
     return authorMatches

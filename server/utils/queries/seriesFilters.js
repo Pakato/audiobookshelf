@@ -123,8 +123,8 @@ module.exports = {
     // Handle sort order
     const dir = sortDesc ? 'DESC' : 'ASC'
     if (sortBy === 'numBooks') {
-      seriesAttributes.include.push([Sequelize.literal('(SELECT count(*) FROM bookSeries bs WHERE bs.seriesId = series.id)'), 'numBooks'])
-      order.push(['numBooks', dir])
+      seriesAttributes.include.push([Sequelize.literal('(SELECT count(*) FROM bookSeries bs WHERE bs.seriesId = series.id)'), 'numbooks'])
+      order.push(['numbooks', dir])
     } else if (sortBy === 'addedAt') {
       order.push(['createdAt', dir])
     } else if (sortBy === 'name') {
@@ -134,14 +134,14 @@ module.exports = {
         order.push([Sequelize.literal(noCaseSortExpression('series.name', Database.sequelize)), dir])
       }
     } else if (sortBy === 'totalDuration') {
-      seriesAttributes.include.push([Sequelize.literal('(SELECT SUM(b.duration) FROM books b, bookSeries bs WHERE bs.seriesId = series.id AND b.id = bs.bookId)'), 'totalDuration'])
-      order.push(['totalDuration', dir])
+      seriesAttributes.include.push([Sequelize.literal('(SELECT SUM(b.duration) FROM books b, bookSeries bs WHERE bs.seriesId = series.id AND b.id = bs.bookId)'), 'totalduration'])
+      order.push(['totalduration', dir])
     } else if (sortBy === 'lastBookAdded') {
-      seriesAttributes.include.push([Sequelize.literal('(SELECT MAX(b.createdAt) FROM books b, bookSeries bs WHERE bs.seriesId = series.id AND b.id = bs.bookId)'), 'mostRecentBookAdded'])
-      order.push(['mostRecentBookAdded', dir])
+      seriesAttributes.include.push([Sequelize.literal('(SELECT MAX(b.createdAt) FROM books b, bookSeries bs WHERE bs.seriesId = series.id AND b.id = bs.bookId)'), 'mostrecentbookadded'])
+      order.push(['mostrecentbookadded', dir])
     } else if (sortBy === 'lastBookUpdated') {
-      seriesAttributes.include.push([Sequelize.literal('(SELECT MAX(b.updatedAt) FROM books b, bookSeries bs WHERE bs.seriesId = series.id AND b.id = bs.bookId)'), 'mostRecentBookUpdated'])
-      order.push(['mostRecentBookUpdated', dir])
+      seriesAttributes.include.push([Sequelize.literal('(SELECT MAX(b.updatedAt) FROM books b, bookSeries bs WHERE bs.seriesId = series.id AND b.id = bs.bookId)'), 'mostrecentbookupdated'])
+      order.push(['mostrecentbookupdated', dir])
     } else if (sortBy === 'random') {
       order.push(Database.sequelize.random())
     }
@@ -184,8 +184,8 @@ module.exports = {
     for (const s of series) {
       const oldSeries = s.toOldJSON()
 
-      if (s.dataValues.totalDuration) {
-        oldSeries.totalDuration = s.dataValues.totalDuration
+      if (s.dataValues.totalduration) {
+        oldSeries.totalDuration = s.dataValues.totalduration
       }
 
       if (s.feeds?.length) {
