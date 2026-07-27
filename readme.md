@@ -1,3 +1,105 @@
+# audiobookshelf-postgres
+
+A fork of the official [advplyr/audiobookshelf](https://hub.docker.com/r/advplyr/audiobookshelf) Docker image, modified to support **PostgreSQL** as a database backend. 
+
+This image allows you to run Audiobookshelf with a robust, scalable PostgreSQL database instead of the default SQLite.
+
+## ⚠️ Important: How Migration Works
+
+Because this fork hooks into Audiobookshelf's internal database abstraction, **migrating your existing SQLite library to PostgreSQL is handled via the application's built-in backup/restore feature.** 
+
+You **must** either restore a previously made backup, or start a completely fresh instance. 
+
+## 🛠️ Environment Variables
+
+To use PostgreSQL, you must pass two new environment variables to your Docker container:
+
+*   **`DB_DIALECT`**: Must be set to `postgres`.
+*   **`DATABASE_URL`**: Your PostgreSQL connection string.
+
+### Example Connection String:
+```text
+DATABASE_URL=postgres://audiobookshelf:secret@postgresql:5432/audiobookshelf
+```
+*(Format: `postgres://USERNAME:PASSWORD@HOST:PORT/DATABASE_NAME`)*
+
+## 🚀 How to Deploy & Migrate
+
+### Step 1: Start a fresh container with the new variables
+Deploy the container using Docker CLI or Docker Compose (see examples below) ensuring the `DB_DIALECT` and `DATABASE_URL` variables are set. 
+
+### Step 2: Restore Your Backup (Migration)
+When the container starts with the Postgres variables, it will initialize an empty PostgreSQL database. 
+1. Open the Audiobookshelf web UI and log in.
+2. Navigate to the **Settings** area.
+3. Go to **Backups**.
+4. Upload a backup `.abs` file generated from your previous (SQLite) Audiobookshelf instance.
+5. Click **Restore** on that backup.
+
+During the restoration process, the fork will automatically read the SQLite backup and seamlessly migrate all your data (users, libraries, metadata, reading progress, etc.) into the PostgreSQL database. Once complete, your server will restart running entirely on Postgres.
+
+*(Note: If you do not have a backup to restore, you can simply set up the server from scratch as a new instance).*
+
+## 🐳 Docker Compose Example
+
+Here is a complete `docker-compose.yml` to get you running with PostgreSQL:
+
+```yaml
+version: '3.9'
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: audiobookshelf
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: audiobookshelf
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  audiobookshelf:
+    image: pakato/audiobookshelf-postgres:latest
+    ports:
+      - "80:80"
+    environment:
+      - DB_DIALECT=postgres
+      - DATABASE_URL=postgres://audiobookshelf:secret@postgres:5432/audiobookshelf
+    volumes:
+      - audiobooks:/audiobooks
+      - podcasts:/podcasts
+      - config:/config
+      - metadata:/metadata
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+  audiobooks:
+  podcasts:
+  config:
+  metadata:
+```
+
+## Docker CLI Example
+
+```bash
+docker run -d \
+  --name audiobookshelf \
+  -p 80:80 \
+  -e DB_DIALECT=postgres \
+  -e DATABASE_URL="postgres://audiobookshelf:secret@postgresql:5432/audiobookshelf" \
+  -v /path/to/config:/config \
+  -v /path/to/metadata:/metadata \
+  -v /path/to/audiobooks:/audiobooks \
+  pakato/audiobookshelf-postgres:latest
+```
+
+## Credits
+Based entirely on the hard work of [Advplyr](https://github.com/advplyr/audiobookshelf) and the Audiobookshelf contributors. This repository simply maintains a fork with PostgreSQL database driver support.
+
+Thank you for github user [kevingatera](https://github.com/kevingatera) for doing most of the work on this support.
+
 <br />
 <div align="center">
    <img alt="Audiobookshelf Banner" src="https://github.com/advplyr/audiobookshelf/raw/master/images/banner.svg" width="600">

@@ -138,6 +138,8 @@ class Book extends Model {
    * @param {import('../Database').sequelize} sequelize
    */
   static init(sequelize) {
+    const titleIndexField = sequelize.getDialect() === 'postgres' ? 'title' : { name: 'title', collate: 'NOCASE' }
+
     super.init(
       {
         id: {
@@ -147,7 +149,7 @@ class Book extends Model {
         },
         title: DataTypes.STRING,
         titleIgnorePrefix: DataTypes.STRING,
-        subtitle: DataTypes.STRING,
+        subtitle: DataTypes.TEXT,
         publishedYear: DataTypes.STRING,
         publishedDate: DataTypes.STRING,
         publisher: DataTypes.STRING,
@@ -157,7 +159,7 @@ class Book extends Model {
         language: DataTypes.STRING,
         explicit: DataTypes.BOOLEAN,
         abridged: DataTypes.BOOLEAN,
-        coverPath: DataTypes.STRING,
+        coverPath: DataTypes.STRING(500),
         duration: DataTypes.FLOAT,
 
         narrators: DataTypes.JSON,
@@ -172,12 +174,7 @@ class Book extends Model {
         modelName: 'book',
         indexes: [
           {
-            fields: [
-              {
-                name: 'title',
-                collate: 'NOCASE'
-              }
-            ]
+            fields: [titleIndexField]
           },
           // {
           //   fields: [{
