@@ -64,7 +64,7 @@ class Session extends Model {
         ipAddress: DataTypes.STRING,
         userAgent: DataTypes.STRING,
         refreshToken: {
-          type: DataTypes.STRING,
+          type: DataTypes.TEXT,
           allowNull: false
         },
         expiresAt: {
@@ -72,7 +72,7 @@ class Session extends Model {
           allowNull: false
         },
         lastRefreshToken: {
-          type: DataTypes.STRING,
+          type: DataTypes.TEXT,
           allowNull: true
         },
         lastRefreshTokenExpiresAt: {
