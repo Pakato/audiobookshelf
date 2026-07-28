@@ -451,8 +451,13 @@ class User extends Model {
     const cachedUser = userCache.getByOpenIDSub(sub)
     if (cachedUser) return cachedUser
 
+    const subMatcher =
+      this.sequelize.getDialect() === 'postgres'
+        ? sequelize.where(sequelize.literal(`extradata#>>'{authOpenIDSub}'`), sub)
+        : { 'extraData.authOpenIDSub': sub }
+
     const user = await this.findOne({
-      where: sequelize.where(sequelize.literal(`extraData->>"authOpenIDSub"`), sub),
+      where: subMatcher,
       include: this.sequelize.models.mediaProgress
     })
 
