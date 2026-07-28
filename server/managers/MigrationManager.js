@@ -5,6 +5,7 @@ const path = require('path')
 const Module = require('module')
 const fs = require('../libs/fsExtra')
 const Logger = require('../Logger')
+const { wrapForDialect } = require('../utils/migrationQueryInterface')
 
 class MigrationManager {
   static MIGRATIONS_META_TABLE = 'migrationsMeta'
@@ -27,6 +28,14 @@ class MigrationManager {
     this.databaseVersion = null
     this.serverVersion = null
     this.umzug = null
+  }
+
+  /**
+   * Query interface with dialect compatibility fixes applied
+   * @returns {import('sequelize').QueryInterface}
+   */
+  getQueryInterface() {
+    return wrapForDialect(this.sequelize.getQueryInterface(), Logger)
   }
 
   /**
@@ -181,7 +190,7 @@ class MigrationManager {
           }
         }
       },
-      context: { queryInterface: this.sequelize.getQueryInterface(), logger: Logger },
+      context: { queryInterface: this.getQueryInterface(), logger: Logger },
       storage: umzugStorage,
       logger: Logger
     })
@@ -214,11 +223,15 @@ class MigrationManager {
   }
 
   async checkOrCreateMigrationsMetaTable() {
-    const queryInterface = this.sequelize.getQueryInterface()
+    const queryInterface = this.getQueryInterface()
     let migrationsMetaTableExists = await this.tableExists(MigrationManager.MIGRATIONS_META_TABLE)
 
     // If the table exists, check that the `version` and `maxVersion` rows exist
     if (migrationsMetaTableExists) {
+      // Repair databases that accumulated duplicate rows while tableExists() was misreporting
+      // the table as missing on postgres and re-inserting the seed rows on every startup
+      await this.deduplicateMigrationsMeta()
+
       const [{ count }] = await this.sequelize.query(`SELECT COUNT(*) as count FROM ${MigrationManager.MIGRATIONS_META_TABLE} WHERE key IN ('version', 'maxVersion')`, {
         type: Sequelize.QueryTypes.SELECT
       })
@@ -255,18 +268,49 @@ class MigrationManager {
     }
   }
 
+  /**
+   * Collapse duplicate `version`/`maxVersion` rows down to a single row each, keeping the highest
+   * version seen. Duplicates mean the seed rows were re-inserted on a database that was already
+   * migrated, so the highest value is the one that reflects the real schema.
+   */
+  async deduplicateMigrationsMeta() {
+    const migrationsMetaTable = MigrationManager.MIGRATIONS_META_TABLE
+
+    for (const key of ['version', 'maxVersion']) {
+      const rows = await this.sequelize.query(`SELECT value FROM ${migrationsMetaTable} WHERE key = :key`, {
+        replacements: { key },
+        type: Sequelize.QueryTypes.SELECT
+      })
+      if (rows.length <= 1) continue
+
+      const highest = rows
+        .map((row) => row.value)
+        .filter((value) => semver.valid(value))
+        .sort(semver.rcompare)[0]
+      if (!highest) continue
+
+      Logger.warn(`[MigrationManager] Found ${rows.length} '${key}' rows in ${migrationsMetaTable}. Collapsing to highest value: ${highest}`)
+      await this.sequelize.query(`DELETE FROM ${migrationsMetaTable} WHERE key = :key`, {
+        replacements: { key },
+        type: Sequelize.QueryTypes.DELETE
+      })
+      await this.sequelize.query(`INSERT INTO ${migrationsMetaTable} (key, value) VALUES (:key, :value)`, {
+        replacements: { key, value: highest },
+        type: Sequelize.QueryTypes.INSERT
+      })
+    }
+  }
+
   async tableExists(tableName) {
-    const queryInterface = this.sequelize.getQueryInterface()
+    const queryInterface = this.getQueryInterface()
     if (typeof queryInterface.tableExists === 'function') {
       return queryInterface.tableExists(tableName)
     }
 
+    // showAllTables also reports postgres' folded lower case names, so compare case-insensitively
     const tables = await queryInterface.showAllTables()
-    return tables.some((table) => {
-      if (typeof table === 'string') return table === tableName
-      if (table?.tableName) return table.tableName === tableName
-      return false
-    })
+    const matches = (name) => typeof name === 'string' && name.toLowerCase() === tableName.toLowerCase()
+    return tables.some((table) => matches(typeof table === 'string' ? table : table?.tableName))
   }
 
   extractVersionFromTag(tag) {

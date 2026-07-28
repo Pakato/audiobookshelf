@@ -340,6 +340,43 @@ describe('MigrationManager', () => {
       expect(manager.databaseVersion).to.equal('1.1.0')
       expect(manager.maxVersion).to.equal('1.2.0')
     })
+
+    it('should collapse duplicate version rows to the highest version', async () => {
+      // Arrange - a database that had the seed rows re-inserted on every startup
+      const sequelize = new Sequelize({ dialect: 'sqlite', storage: ':memory:', logging: false })
+      await sequelize.query('CREATE TABLE migrationsMeta (key VARCHAR(255), value VARCHAR(255))')
+      await sequelize.query("INSERT INTO migrationsMeta (key, value) VALUES ('version', '0.0.0'), ('maxVersion', '0.0.0')")
+      await sequelize.query("INSERT INTO migrationsMeta (key, value) VALUES ('version', '1.1.0'), ('maxVersion', '1.1.0')")
+      await sequelize.query("INSERT INTO migrationsMeta (key, value) VALUES ('version', '0.0.0'), ('maxVersion', '0.0.0')")
+      const migrationManager = new MigrationManager(sequelize, false, configPath)
+      migrationManager.serverVersion = serverVersion
+
+      // Act
+      await migrationManager.fetchVersionsFromDatabase()
+
+      // Assert - the real schema version wins, not the re-seeded 0.0.0
+      expect(migrationManager.databaseVersion).to.equal('1.1.0')
+      expect(migrationManager.maxVersion).to.equal('1.1.0')
+
+      const rows = await sequelize.query('SELECT key, value FROM migrationsMeta', { type: Sequelize.QueryTypes.SELECT })
+      expect(rows).to.have.lengthOf(2)
+    })
+
+    it('should leave a healthy migrationsMeta table untouched', async () => {
+      // Arrange
+      const sequelize = new Sequelize({ dialect: 'sqlite', storage: ':memory:', logging: false })
+      await sequelize.query('CREATE TABLE migrationsMeta (key VARCHAR(255), value VARCHAR(255))')
+      await sequelize.query("INSERT INTO migrationsMeta (key, value) VALUES ('version', '1.1.0'), ('maxVersion', '1.1.0')")
+      const migrationManager = new MigrationManager(sequelize, false, configPath)
+      migrationManager.serverVersion = serverVersion
+
+      // Act
+      await migrationManager.fetchVersionsFromDatabase()
+
+      // Assert
+      expect(migrationManager.databaseVersion).to.equal('1.1.0')
+      expect(migrationManager.maxVersion).to.equal('1.1.0')
+    })
   })
 
   describe('updateMaxVersion', () => {
