@@ -14,12 +14,35 @@ on:
       - 'v*.*.*'
 
 jobs:
-  build:
+  check-ref:
     if: >-
       github.repository == 'pakato/audiobookshelf' &&
-      !contains(github.event.head_commit.message, 'skip ci') &&
-      (github.event_name == 'workflow_dispatch' ||
-       contains(fromJSON('["refs/heads/main", "refs/heads/master"]'), github.event.base_ref))
+      !contains(github.event.head_commit.message, 'skip ci')
+    runs-on: ubuntu-24.04
+    outputs:
+      proceed: ${{ steps.decide.outputs.proceed }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Decide whether tag is on main/master
+        id: decide
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git merge-base --is-ancestor "${{ github.sha }}" origin/master 2>/dev/null || git merge-base --is-ancestor "${{ github.sha }}" origin/main 2>/dev/null; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: check-ref
+    if: needs.check-ref.outputs.proceed == 'true'
     runs-on: ubuntu-24.04
 
     steps:
